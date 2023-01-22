@@ -1,4 +1,3 @@
-
 interface NDArray : SizeAware, DimentionAware {
     /*
      * Получаем значение по индексу point
@@ -85,7 +84,7 @@ interface NDArray : SizeAware, DimentionAware {
  */
 
 
-class DefaultNDArray(private val shape: Shape) : NDArray {
+class DefaultNDArray private constructor(private val shape: Shape) : NDArray {
     override val size: Int = shape.size
     override val ndim: Int = shape.ndim
     private var nums = IntArray(size)
@@ -95,15 +94,14 @@ class DefaultNDArray(private val shape: Shape) : NDArray {
         var index = 0
         for (i in 0 until point.ndim) {
             if (point.dim(i) >= shape.dim(i)) {
-                throw NDArrayException.IllegalPointCoordinateException("Coordinate mismatch")
+                throw NDArrayException.IllegalPointCoordinateException(i)
             }
             index += point.dim(i) * prefixProduct[i]
         }
         return index
     }
 
-    private val dimensionList
-        get() = MutableList(ndim) { i -> shape.dim(i) }
+    private val dimensionList = MutableList(ndim) { i -> shape.dim(i) }
 
     private fun addHelper(dimensions: List<Int>, list: MutableList<Int> = mutableListOf()): List<List<Int>> =
         buildList {
@@ -132,15 +130,15 @@ class DefaultNDArray(private val shape: Shape) : NDArray {
         }
     }
 
-    private fun checkDimensions(other: NDArray) {
-        if (!(0 until other.ndim).all { dim(it) == other.dim(it) }) {
-            throw NDArrayException.IncompatibleArgumentsException("Dimensions of Arrays are incompatible")
+    private fun checkDimensions(other: NDArray) =
+        (0 until other.ndim).firstOrNull { dim(it) != other.dim(it) }?.also {
+            throw NDArrayException.IncompatibleArgumentsException(dim(it), other.dim(it))
         }
-    }
+
 
     override fun add(other: NDArray) {
         if ((ndim - other.ndim) !in 0..1)
-            throw NDArrayException.IncompatibleArgumentsException("Dimensions of Arrays are incompatible")
+            throw NDArrayException.IncompatibleArgumentsException(ndim, other.ndim)
         checkDimensions(other)
         if (ndim == other.ndim)
             addIdentical(other)
@@ -150,7 +148,7 @@ class DefaultNDArray(private val shape: Shape) : NDArray {
 
     override fun dot(other: NDArray): NDArray {
         if (ndim != 2 || other.ndim > 2 || dim(1) != other.dim(0)) {
-            throw NDArrayException.IllegalArgumentsException("Dimensions are incorrect")
+            throw NDArrayException.IllegalArgumentsException(ndim, other.ndim)
         }
         val finalShape = IntArray(2)
         finalShape[0] = dim(0)
@@ -183,14 +181,14 @@ class DefaultNDArray(private val shape: Shape) : NDArray {
     override fun dim(i: Int) = shape.dim(i)
     override fun at(point: Point): Int {
         if (point.ndim != ndim) {
-            throw NDArrayException.IllegalPointDimensionException("Dimensions of point are unsuitable")
+            throw NDArrayException.IllegalPointDimensionException(point.ndim, ndim)
         }
         return nums[getIndex(point)]
     }
 
     override fun set(point: Point, value: Int) {
         if (point.ndim != ndim) {
-            throw NDArrayException.IllegalPointDimensionException("Dimensions of point are unsuitable")
+            throw NDArrayException.IllegalPointDimensionException(point.ndim, ndim)
         }
         nums[getIndex(point)] = value
     }
@@ -215,11 +213,11 @@ class DefaultNDArray(private val shape: Shape) : NDArray {
     }
 }
 
-class DefaultNDArrayView(array: NDArray) : NDArray by array
+internal class DefaultNDArrayView(array: NDArray) : NDArray by array
 
-sealed class NDArrayException : Exception() {
-    class IllegalPointCoordinateException(message: String) : Exception(message)
-    class IllegalPointDimensionException(message: String) : Exception(message)
-    class IncompatibleArgumentsException(message: String) : Exception(message)
-    class IllegalArgumentsException(message: String) : Exception(message)
+sealed class NDArrayException(msg: String) : Exception(msg) {
+    class IllegalPointCoordinateException(posOfException: Int) : NDArrayException("Coordinate mismatch at position $posOfException")
+    class IllegalPointDimensionException(illegalDimension: Int, dimension: Int) : Exception("Unsuitable Dimensions : $illegalDimension is not $dimension")
+    class IncompatibleArgumentsException(arg1: Int, arg2: Int) : Exception("Incompatible arguments $arg1 and $arg2")
+    class IllegalArgumentsException(dim1: Int, dim2: Int) : Exception("Unsuitable dimensions for operation : $dim1 , $dim2")
 }
