@@ -3,13 +3,18 @@
  */
 package homework03
 
-class App {
-    val greeting: String
-        get() {
-            return "Hello World!"
-        }
-}
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
-fun main() {
-    println(App().greeting)
+fun main(vararg args: String) = runBlocking {
+    if (args.isEmpty()) {
+        println("Command line should contain names of subReddits")
+    } else {
+        for (word in args) {
+            launch {
+                RedditClient().parse(word)
+            }
+        }
+    }
 }
